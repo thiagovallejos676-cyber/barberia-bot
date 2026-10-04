@@ -1,0 +1,7 @@
+node_modules
+.next
+.git
+whatsapp-bot/auth_sessions
+whatsapp-bot/auth_baileys
+whatsapp-bot/*.html
+*.log
