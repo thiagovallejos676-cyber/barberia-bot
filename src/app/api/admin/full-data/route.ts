@@ -3,6 +3,11 @@ import { createAdminClient } from '@/lib/supabase-admin'
 import { getBarberiaIdActual } from '@/lib/session-helper'
 import { format } from 'date-fns'
 
+function getHoyArgentina() {
+  const str = new Date().toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" })
+  return format(new Date(str), 'yyyy-MM-dd')
+}
+
 export async function GET() {
   try {
     const barberiaId = await getBarberiaIdActual()
@@ -11,9 +16,8 @@ export async function GET() {
     }
 
     const supabase = createAdminClient()
-    const hoy = format(new Date(), 'yyyy-MM-dd')
+    const hoy = getHoyArgentina()
 
-    // Consultar cada tabla de forma limpia sin depender de joins automaticos
     const [
       { data: barberia },
       { data: barberos },
@@ -28,12 +32,10 @@ export async function GET() {
       supabase.from('clientes').select('*')
     ])
 
-    // Crear mapas de busqueda rapida en JS
     const clienteMap = new Map((clientes || []).map(c => [c.id, c]))
     const barberoMap = new Map((barberos || []).map(b => [b.id, b]))
     const servicioMap = new Map((servicios || []).map(s => [s.id, s]))
 
-    // Mapear y enriquecer los turnos garantizando que NUNCA fallen los datos
     const turnosEnriquecidos = (rawTurnos || []).map((t: any) => ({
       ...t,
       clientes: clienteMap.get(t.cliente_id) || { nombre: 'Cliente', telefono: 'Sin número' },
