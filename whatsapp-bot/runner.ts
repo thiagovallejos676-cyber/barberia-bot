@@ -159,8 +159,29 @@ async function procesarRecordatorios() {
       const minutosFaltantes =
         (fechaTurno.getTime() - ahoraArgentina.getTime()) / 60000
 
-      // Enviar solamente cuando falten entre 1h55 y 2h.
-      if (minutosFaltantes < 115 || minutosFaltantes > 120) {
+      // Si el turno ya pas?, no enviar nada.
+      if (minutosFaltantes <= 0) {
+        continue
+      }
+
+      // Momento en que se cre? la reserva.
+      const creadoEn = new Date(t.created_at)
+      const minutosDesdeCreacion =
+        (Date.now() - creadoEn.getTime()) / 60000
+
+      // Caso 1: turno reservado con anticipaci?n:
+      // enviar cuando falten entre 1h55 y 2h.
+      const estaEnVentanaDeDosHoras =
+        minutosFaltantes >= 115 && minutosFaltantes <= 120
+
+      // Caso 2: turno reservado cuando ya faltaban menos de 1h55:
+      // enviarlo inmediatamente (durante los primeros 5 minutos).
+      const esReservaReciente =
+        minutosFaltantes < 115 &&
+        minutosDesdeCreacion >= 0 &&
+        minutosDesdeCreacion <= 5
+
+      if (!estaEnVentanaDeDosHoras && !esReservaReciente) {
         continue
       }
 
