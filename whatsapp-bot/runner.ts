@@ -131,7 +131,16 @@ async function initBarberiaSession(barberiaId: string) {
 
 async function procesarRecordatorios() {
   try {
-    const hoy = new Date().toISOString().split('T')[0]
+    const ahoraArgentina = new Date(
+      new Date().toLocaleString('en-US', {
+        timeZone: 'America/Argentina/Buenos_Aires'
+      })
+    )
+
+    const hoy =
+      ahoraArgentina.getFullYear() + '-' +
+      String(ahoraArgentina.getMonth() + 1).padStart(2, '0') + '-' +
+      String(ahoraArgentina.getDate()).padStart(2, '0')
 
     const { data: turnos } = await supabase
       .from('turnos')
@@ -143,6 +152,18 @@ async function procesarRecordatorios() {
     if (!turnos || turnos.length === 0) return
 
     for (const t of turnos as any[]) {
+      const [hora, minuto] = t.hora_inicio.slice(0, 5).split(':').map(Number)
+      const fechaTurno = new Date(ahoraArgentina)
+      fechaTurno.setHours(hora, minuto, 0, 0)
+
+      const minutosFaltantes =
+        (fechaTurno.getTime() - ahoraArgentina.getTime()) / 60000
+
+      // Enviar solamente cuando falten entre 1h55 y 2h.
+      if (minutosFaltantes < 115 || minutosFaltantes > 120) {
+        continue
+      }
+
       const barberiaId = t.barberia_id
       const sock = activeSockets.get(barberiaId)
       const conectado = activeStatuses.get(barberiaId)
