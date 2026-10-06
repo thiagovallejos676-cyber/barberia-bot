@@ -19,6 +19,81 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://barberia-saas.vercel
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
+const AUTH_BUCKET = 'whatsapp-sessions'
+
+async function restaurarSesion(barberiaId: string, sessionFolder: string) {
+  if (!fs.existsSync(sessionFolder)) {
+    fs.mkdirSync(sessionFolder, { recursive: true })
+  }
+
+  const { data: archivos, error } = await supabase.storage
+    .from(AUTH_BUCKET)
+    .list(barberiaId, { limit: 1000 })
+
+  if (error) throw error
+
+  for (const archivo of archivos || []) {
+    if (!archivo.name) continue
+
+    const { data, error: downloadError } = await supabase.storage
+      .from(AUTH_BUCKET)
+      .download(`${barberiaId}/${archivo.name}`)
+
+    if (downloadError) throw downloadError
+
+    const buffer = Buffer.from(await data.arrayBuffer())
+    fs.writeFileSync(path.join(sessionFolder, archivo.name), buffer)
+  }
+}
+
+async function guardarSesion(barberiaId: string, sessionFolder: string) {
+  if (!fs.existsSync(sessionFolder)) return
+
+  const archivosLocales = fs.readdirSync(sessionFolder)
+    .filter(nombre =>
+      fs.statSync(path.join(sessionFolder, nombre)).isFile()
+    )
+
+  for (const nombre of archivosLocales) {
+    const contenido = fs.readFileSync(path.join(sessionFolder, nombre))
+
+    const { error } = await supabase.storage
+      .from(AUTH_BUCKET)
+      .upload(
+        `${barberiaId}/${nombre}`,
+        contenido,
+        {
+          upsert: true,
+          contentType: 'application/json'
+        }
+      )
+
+    if (error) throw error
+  }
+}
+
+async function borrarSesionGuardada(barberiaId: string) {
+  const { data: archivos, error } = await supabase.storage
+    .from(AUTH_BUCKET)
+    .list(barberiaId, { limit: 1000 })
+
+  if (error) throw error
+  if (!archivos?.length) return
+
+  const rutas = archivos
+    .filter(a => a.name)
+    .map(a => `${barberiaId}/${a.name}`)
+
+  if (rutas.length) {
+    const { error: removeError } = await supabase.storage
+      .from(AUTH_BUCKET)
+      .remove(rutas)
+
+    if (removeError) throw removeError
+  }
+}
+
+
 const activeSockets = new Map<string, any>()
 const activeStatuses = new Map<string, boolean>()
 const isInitializing = new Set<string>()
@@ -42,7 +117,7 @@ async function syncSessions() {
     for (const session of sessions || []) {
       const barberiaId = session.barberia_id
 
-      if ((session.status === 'INIT_REQUEST' || session.status === 'QR_READY') && !activeSockets.has(barberiaId) && !isInitializing.has(barberiaId)) {
+      if ((session.status === 'INIT_REQUEST' || session.status === 'QR_READY' || session.status === 'CONNECTED') && !activeSockets.has(barberiaId) && !isInitializing.has(barberiaId)) {
         console.log(`âš¡ Procesando solicitud para BarberÃ­a ID: ${barberiaId}`)
         initBarberiaSession(barberiaId)
       }
@@ -59,6 +134,14 @@ async function syncSessions() {
         const sessionFolder = path.join(__dirname, 'auth_sessions', `session_${barberiaId}`)
         if (fs.existsSync(sessionFolder)) {
           fs.rmSync(sessionFolder, { recursive: true, force: true })
+        }
+
+        // Borrar tambien la sesion persistente de Supabase
+        try {
+          await borrarSesionGuardada(barberiaId)
+          console.log(`Sesion eliminada de Supabase: ${barberiaId}`)
+        } catch (error) {
+          console.error(`Error eliminando sesion de Supabase ${barberiaId}:`, error)
         }
 
         await supabase.from('whatsapp_sessions').update({
@@ -78,6 +161,14 @@ async function initBarberiaSession(barberiaId: string) {
   const sessionFolder = path.join(__dirname, 'auth_sessions', `session_${barberiaId}`)
   if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true })
 
+  // Restaurar la sesion guardada en Supabase antes de iniciar WhatsApp
+  try {
+    await restaurarSesion(barberiaId, sessionFolder)
+    console.log(`Sesion restaurada desde Supabase: ${barberiaId}`)
+  } catch (error) {
+    console.error(`Error restaurando sesion ${barberiaId}:`, error)
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder)
 
   const sock = makeWASocket({
@@ -87,7 +178,15 @@ async function initBarberiaSession(barberiaId: string) {
   })
 
   activeSockets.set(barberiaId, sock)
-  sock.ev.on('creds.update', saveCreds)
+  sock.ev.on('creds.update', async () => {
+    try {
+      await saveCreds()
+      await guardarSesion(barberiaId, sessionFolder)
+      console.log(`Sesion guardada en Supabase: ${barberiaId}`)
+    } catch (error) {
+      console.error(`Error guardando sesion ${barberiaId}:`, error)
+    }
+  })
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update
