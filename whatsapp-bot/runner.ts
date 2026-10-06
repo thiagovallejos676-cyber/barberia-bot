@@ -55,7 +55,9 @@ async function guardarSesion(barberiaId: string, sessionFolder: string) {
     )
 
   for (const nombre of archivosLocales) {
-    const contenido = fs.readFileSync(path.join(sessionFolder, nombre))
+    const rutaArchivo = path.join(sessionFolder, nombre)
+    if (!fs.existsSync(rutaArchivo)) continue
+    const contenido = fs.readFileSync(rutaArchivo)
 
     const { error } = await supabase.storage
       .from(AUTH_BUCKET)
