@@ -263,24 +263,13 @@ async function procesarRecordatorios() {
         continue
       }
 
-      // Momento en que se cre? la reserva.
-      const creadoEn = new Date(t.created_at)
-      const minutosDesdeCreacion =
-        (Date.now() - creadoEn.getTime()) / 60000
+      // Si todavia faltan 2 horas o menos y el recordatorio
+      // sigue pendiente, enviarlo. Esto permite recuperar mensajes
+      // aunque Render haya estado dormido cuando se cumplieron las 2 horas.
+      const debeEnviarRecordatorio =
+        minutosFaltantes > 0 && minutosFaltantes <= 120
 
-      // Caso 1: turno reservado con anticipaci?n:
-      // enviar cuando falten entre 1h55 y 2h.
-      const estaEnVentanaDeDosHoras =
-        minutosFaltantes >= 115 && minutosFaltantes <= 120
-
-      // Caso 2: turno reservado cuando ya faltaban menos de 1h55:
-      // enviarlo inmediatamente (durante los primeros 5 minutos).
-      const esReservaReciente =
-        minutosFaltantes < 115 &&
-        minutosDesdeCreacion >= 0 &&
-        minutosDesdeCreacion <= 5
-
-      if (!estaEnVentanaDeDosHoras && !esReservaReciente) {
+      if (!debeEnviarRecordatorio) {
         continue
       }
 
