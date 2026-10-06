@@ -292,18 +292,18 @@ async function procesarRecordatorios() {
           const linkCancelar = `${APP_URL}/cancelar/${t.token_cancelacion}`
 
           const mensaje =
-            `ðŸ”” *RECORDATORIO DE TURNO*\n\n` +
-            `Hola *${t.clientes?.nombre}*! ðŸ‘‹\n\n` +
+            `🔔 *RECORDATORIO DE TURNO*\n\n` +
+            `Hola *${t.clientes?.nombre}* 👋\n\n` +
             `Te recordamos tu turno para hoy:\n\n` +
-            `ðŸª *${t.barberias?.nombre}*\n` +
-            `ðŸ• Hora: *${t.hora_inicio.slice(0,5)} hs*\n` +
-            `âœ‚ï¸ Barbero: *${t.barberos?.nombre}*\n` +
-            `ðŸ’ˆ Servicio: *${t.servicios?.nombre}*\n\n` +
-            `â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n` +
-            `âš ï¸ *Â¿No vas a poder asistir?*\n` +
-            `CancelÃ¡ tu turno haciendo clic acÃ¡ para liberar el cupo:\n` +
-            `ðŸ‘‰ ${linkCancelar}\n\n` +
-            `Â¡Muchas gracias! ðŸ™`
+            `🏪 *${t.barberias?.nombre}*\n` +
+            `🕐 Hora: *${t.hora_inicio.slice(0,5)} hs*\n` +
+            `✂️ Barbero: *${t.barberos?.nombre}*\n` +
+            `💈 Servicio: *${t.servicios?.nombre}*\n\n` +
+            `━━━━━━━━━━━━━━━\n\n` +
+            `⚠️ *¿No vas a poder asistir?*\n` +
+            `Cancelá tu turno haciendo clic acá para liberar el cupo:\n` +
+            `👉 ${linkCancelar}\n\n` +
+            `¡Muchas gracias! 🙏`
 
           await sock.sendMessage(jid, { text: mensaje })
           await supabase.from('turnos').update({ recordatorio_enviado: true }).eq('id', t.id)
